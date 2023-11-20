@@ -156,7 +156,7 @@ def clean_and_transform_data(incremental_data):
 
 
 # Write the new data with surrogate keys back to OLAP data warehouse
-def write_to_olap(df_with_keys,your_table):
+def write_to_warehouse(df_with_keys,your_table):
     df_with_keys.write.jdbc(
         url=olap_connection_properties['url'],
         table=your_table,
