@@ -3,7 +3,7 @@ from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from pyspark.sql import SparkSession
 from Quality_Checks import Quality_Check
-from spark_etl import get_latest_fact_id,read_incremental_from_oltp,clean_and_transform_data,write_to_olap
+from spark_etl import get_latest_fact_id,read_incremental_from_oltp,clean_and_transform_data,write_to_warehouse
 
 
 
@@ -57,7 +57,7 @@ def load_data_task():
     # Your data loading logic here\
     load_task = PythonOperator(
         task_id='load_data',
-        python_callable=write_to_olap,
+        python_callable=write_to_olap_warehouse,
         op_kwargs = {df_with_keys:"df",your_table:"table"},
         dag=dag,
     )
