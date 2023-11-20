@@ -17,7 +17,8 @@ class SparkETL:
         self.spark = spark
 
     def loan_condition(self, emp_length):
-        """ Helper method for data cleaning, which replaces employment length with integers """
+        """ Helper method for data cleaning, 
+        which replaces employment length with integers """
         return (
             col(emp_length)
             .when(col(emp_length).like('%10+'), 10)
