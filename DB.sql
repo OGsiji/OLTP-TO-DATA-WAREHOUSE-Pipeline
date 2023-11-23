@@ -1,35 +1,3 @@
--- Drop the table if it exists
-DROP TABLE IF EXISTS "warehouse schema"."Loan_facts";
-
--- Create the table in the "warehouse schema"
-CREATE TABLE "warehouse schema"."Loan_facts"
-(
-    FACT_ID SERIAL NOT NULL,
-    Application_ID VARCHAR NOT NULL,
-    Transaction_ID VARCHAR NOT NULL,
-    LOAN_DATE_ID VARCHAR NOT NULL,
-    CUSTOMER_ID VARCHAR NOT NULL,
-    LOAN_AMOUNT BIGINT NOT NULL,
-    BALANCE BIGINT NOT NULL
-);
-
--- Insert data into Loan_facts table
-INSERT INTO "warehouse schema"."Loan_facts" ("application_id", "transaction_id", "loan_date_id", "customer_id", "loan_amount", "balance")
-SELECT
-    p."Application_ID",
-    r."Transaction_ID",
-    REPLACE("Loan_Application_Date", '-', '') as loan_date_id,
-    r."Customer_ID",
-    p."Loan_Amount",
-    r."Balance"
-FROM
-    public."Loan_Application_data"  as p
-JOIN
-    "Customer_Bank_Statement_data" r ON p."Customer_ID" = r."Customer_ID";
-
--- Display Sample Records from Loan Facts Table
-SELECT * FROM "warehouse schema"."Loan_facts" LIMIT 5;
-
 -- Create Transaction Dimension Table
 CREATE TABLE "warehouse schema"."Transaction_dim"
 (
@@ -58,7 +26,7 @@ DROP TABLE IF EXISTS "warehouse schema"."Customer_dim";
 -- Create Customer Dimension Table
 CREATE TABLE "warehouse schema"."Customer_dim"
 (
-    CUSTOMER_ID VARCHAR NOT NULL,
+    CUSTOMER_ID VARCHAR PRIMARY KEY,
     APP_ID VARCHAR NOT NULL,
     CREDIT_SCORE INT NOT NULL,
     EMPLOYEE_STATUS VARCHAR NOT NULL,
@@ -86,6 +54,7 @@ DROP TABLE IF EXISTS "warehouse schema"."dim_date";
 CREATE TABLE "warehouse schema"."dim_date"
 (
     loan_date_id VARCHAR NOT NULL,
+    customer_id VARCHAR NOT NULL,
     date_full DATE NOT NULL,
     year BIGINT NOT NULL,
     month VARCHAR NOT NULL,
@@ -96,12 +65,14 @@ CREATE TABLE "warehouse schema"."dim_date"
     day_name VARCHAR NOT NULL,
     month_name VARCHAR NOT NULL,
     is_weekday INT NOT NULL,
-    is_leapyear INT NOT NULL
+    is_leapyear INT NOT NULL,
+    PRIMARY KEY (loan_date_id,customer_id)
 );
 
 -- Insert data into the dim_date table
 INSERT INTO "warehouse schema"."dim_date" (
     loan_date_id ,
+    customer_id,
     date_full,
     year,
     quarter,
@@ -116,6 +87,7 @@ INSERT INTO "warehouse schema"."dim_date" (
 )
 SELECT
     REPLACE("Loan_Application_Date", '-', '') as loan_date_id,
+    "Customer_ID",
     "Loan_Application_Date"::DATE AS date_full,
     EXTRACT(YEAR FROM TO_DATE("Loan_Application_Date", 'YYYY-MM-DD')) AS year,
     CAST(EXTRACT(QUARTER FROM TO_DATE("Loan_Application_Date", 'YYYY-MM-DD')) AS VARCHAR) AS quarter,
@@ -128,6 +100,7 @@ SELECT
     CASE WHEN EXTRACT(DOW FROM TO_DATE("Loan_Application_Date", 'YYYY-MM-DD')) IN (0, 6) THEN 0 ELSE 1 END AS is_weekday,
     CASE WHEN EXTRACT(ISODOW FROM TO_DATE("Loan_Application_Date", 'YYYY-MM-DD')) = 1 AND EXTRACT(ISODOW FROM TO_DATE("Loan_Application_Date", 'YYYY-MM-DD')) = 366 THEN 1 ELSE 0 END AS is_leapyear
 FROM public." Loan_Application_data";
+
 
 -- Display Sample Records from dim_date Table
 SELECT * FROM "warehouse schema"."dim_date" LIMIT 5;
@@ -147,9 +120,5 @@ JOIN
 JOIN
     "warehouse schema"."Transaction_dim" AS trans ON facts.transaction_id = trans.transaction_id
 GROUP BY
-    1, 2, 3, 4, 5
-ORDER BY
-    customer_id ASC
-LIMIT 50;
-
+    1, 2,
 
