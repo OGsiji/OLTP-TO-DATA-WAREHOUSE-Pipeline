@@ -1,5 +1,5 @@
 # OLAP-TO-OLTP-Pipeline
-An end to end  OLAP TO OLTP  Implementation
+An end to end  OLTP TO OLAP  Implementation
 
 A Comprehensive Approach to Credit Risk Assessment
 
