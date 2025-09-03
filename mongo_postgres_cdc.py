@@ -307,26 +307,42 @@ class GenericKafkaPostgreSQLConsumer:
             # Extract all columns generically
             extracted_data = self.extract_all_data(value_data)
             
-            # Clean column names
+            # Handle column conflicts generically
+            reserved_columns = {
+                'kafka_primary_key', 'kafka_raw_data', 'kafka_topic', 
+                'kafka_updated_at'
+            }
+            
             clean_data = {}
             for key_name, value_item in extracted_data.items():
                 clean_key = self._clean_column_name(key_name)
+                
+                # Handle conflicts with reserved names
+                original_key = clean_key
+                counter = 1
+                
+                while clean_key in reserved_columns or clean_key in clean_data:
+                    clean_key = f"{original_key}_{counter}"
+                    counter += 1
+                
+                # Log if we had to rename
+                if clean_key != original_key:
+                    logger.debug(f"Renamed conflicting column {original_key} to {clean_key}")
+                
                 clean_data[clean_key] = value_item
             
-            # Add metadata
-            clean_data['primary_key'] = primary_key
-            clean_data['raw_data'] = json.dumps(value_data)  # Always preserve original
+            # Add kafka metadata
+            clean_data['kafka_primary_key'] = primary_key
+            clean_data['kafka_raw_data'] = json.dumps(value_data)
             clean_data['kafka_topic'] = topic
-            clean_data['updated_at'] = datetime.now()
+            clean_data['kafka_updated_at'] = datetime.now()
             
-            # Get table name
+            # Get table name and process
             table_name = self.get_table_name(topic)
             
-            # Create table if it doesn't exist
             if table_name not in self.created_tables:
                 self.create_table_dynamically(cursor, table_name, clean_data)
             
-            # Upsert record
             self._upsert_record(cursor, table_name, clean_data)
             
             self.pg_conn.commit()
@@ -339,30 +355,29 @@ class GenericKafkaPostgreSQLConsumer:
         finally:
             cursor.close()
 
+
     def _upsert_record(self, cursor, table_name: str, data: Dict[str, Any]):
-        """Generic upsert for any data structure"""
+        """Generic upsert using kafka_primary_key as the conflict key"""
         
         columns = list(data.keys())
         values = list(data.values())
         placeholders = ['%s'] * len(values)
         
-        # Build upsert query
         columns_str = ', '.join(f'"{col}"' for col in columns)
         placeholders_str = ', '.join(placeholders)
         
-        # Update clause (exclude primary_key from updates)
-        update_columns = [col for col in columns if col != 'primary_key']
+        # Update all columns except the primary key
+        update_columns = [col for col in columns if col != 'kafka_primary_key']
         update_set = ', '.join([f'"{col}" = EXCLUDED."{col}"' for col in update_columns])
         
         upsert_query = f"""
         INSERT INTO "{table_name}" ({columns_str})
         VALUES ({placeholders_str})
-        ON CONFLICT (primary_key) 
+        ON CONFLICT (kafka_primary_key) 
         DO UPDATE SET {update_set}
         """
         
         cursor.execute(upsert_query, values)
-        logger.debug(f"Upserted record in {table_name}")
 
     def setup_kafka_consumer(self):
         """Initialize Kafka consumer"""
